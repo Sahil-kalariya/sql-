@@ -782,7 +782,6 @@ create table t_suppliers(
     supplier_name varchar(100) not null
 );
 
-
 insert into t_suppliers (supplier_id , supplier_name)
 values (100 , 'supp 3') , (1,'supp 1'),
 (2,'supp 2');
@@ -1565,7 +1564,401 @@ where book_info ->>'author'= 'sahil'
 
 select *from book
 
+-- output directors table into json format
+select row_to_json(directors) from directors
+
+-- convrting firstname lastname 
+select row_to_json(t) from (
+    select 
+        first_name,
+        last_name
+    from directors
+) as  t
+
+
+-- 159 select all movies in json for each directors
+select * ,
+(
+    select json_agg(t) from (
+    select  movie_name
+    from movies
+    where director_id = directors.director_id
+) as t
+)
+
+from directors
+
+
+--160 json array
+select json_build_array(1,2,3,'Hi')
+
+select json_build_array('name','sahil','email','abc')
+
+
+-- 161 json inseret data
+create  table docs(
+    doc_id serial  primary key,
+    doc jsonb)
+
+insert into docs(doc)
+select row_to_json(a)from (
+select 
+    first_name,
+    last_name,
+    nationality,
+    (
+        select json_agg(t) from (
+        select movie_name
+        from movies
+        where director_id=directors.director_id
+    )as  t
+    )
+    from directors
+)as a
+
+
+-- 162 create view for movie name with its director
+
+create or replace view v_movies_directors_all as
+select 
+m.movie_name,
+m.release_date,
+d.first_name,
+d.last_name,
+d.nationality
+from 
+movies as m inner join directors as d using (director_id)
+
+select * from v_movies_directors_all
+
+-- 163 altering view name
+alter view v_movies_directors_all rename to v_m_d_all
+
+select * from v_m_d_all
+
+-- 164 delete/drop a view 
+drop view v_m_d_all
+
+--  165 create view to list all movies released after 1997
+create or replace view v_movie_release_after_1997 as
+select * from movies
+where release_date > '1997-12-31'
+
+select * from v_movie_release_after_1997
+where movie_lang = 'English'
+
+--166 select movies  with directors with nationalities 'American', Japanses
+select * from v_movies_directors_all
+where nationality in ('American' , 'Japanese')
+
+--167 select all people like actors and directors
+create or replace view v_all_actors_directors as
+select first_name , 
+last_name,
+'actors' as People_Type
+from actors
+union 
+select first_name , last_name ,
+'directors' as People_Type
+from directors  
+
+select * from v_all_actors_directors
+
+-- 168 join all  tables and create a view
+create or replace view v_movie_director_revenue as  
+select 
+m.movie_id,
+m.movie_length,
+m.movie_name,
+m.movie_lang,
+m.release_date,
+m.age_certificate,
+d.director_id,
+d.first_name,
+d.last_name,
+mr.revenues_domestic,
+mr.revenues_international
+from 
+movies as m inner join directors as d using (director_id)
+inner join movies_revenues as mr using (movie_id)
+
+select * from v_movie_director_revenue
+
+
+-- 168 re aranging / delecte columns in view
+--  delet and create new one
+
+-- 169 add a column , we can add using replace view
+
+create or replace view v_new as
+select 
+first_name,
+last_name
+from directors
+
+-- 170 regular view does give updated data 
+
+
+-- 171 using view to update tables
+
+insert into v_new  (first_name) 
+values ('dir1'),('dir2')
+
+select * from v_new
+
+-- 171 delete from view
+delete from v_new
+where first_name = 'dir1'
+
+-- 172 create a view with check option
+create table country(
+    country_id serial primary key,
+    name varchar(100)
+)
+
+insert into country(name)
+values('US'),('Uk'),('India'),('US')
+
+
+create or replace view v_country as
+select * from country 
+where  name = 'US'
+with check option
+
+insert into v_country(name)
+values ('a')
+
+
+-- 173 materialized view
+
+create materialized view mv_directors as
+select * from directors
+with data
+
+create materialized view mv_directors_2 as
+select * from directors
+with no data
+
+select * from mv_directors
+select * from mv_directors_2
+ 
+refresh materialized view mv_directors_2
+
+
+-- 174 drop a materialize view
+
+drop materialized view mv_directors_2
+
+-- 175 change  mv
+-- cannot change materialized table 
+
+-- 176 how to check if materialized view is populated or not
+create materialized view mv_directors_2 as
+select * from directors
+with no data
+
+select  * from mv_directors_2
+
+select relispopulated from pg_class where relname = 'mv_directors_2'
+
+
+-- 177 referesh data in materialized view
+refresh materialized concurently view mv_directors
+
+-- 178 index on orders 
+select * from orders
+create index idx_or_date on orders(order_date)
+create index idx_or_cusid_ordid on orders(customer_id , order_id)
+
+-- 179 unique ind
+create unique  index idx_u_em_id on employees(employee_id)
+create unique  index idx_u_em_id_hdate on employees(employee_id , hire_date)
+
+--  180 list all indexes
+select * from pg_indexes
+
+-- 181 list sizze of indexes
+select 
+pg_size_pretty(pg_indexes_size('orders'))
+
+-- 182 count all indexes
+select 
+*
+from pg_stat_all_indexes
+
+-- 183 creating hash index
+create index i_od on orders
+using hash (order_date)
+
+-- 184 explain
+explain select * from suppliers where supplier_id = 2    
+
+-- 185 explain analyze
+explain analyze select * from suppliers where supplier_id = 2    
+
+
+-- 186 indexs are not free
+select pg_size_pretty(pg_indexes_size('products'))
+
+select  pg_size_pretty(
+    pg_total_relation_size('products')
+);
+
+explain analyze select *  from  products where product_id = 10
+
+create index ind_pid on products(product_id)
+
+explain analyze select *  from  products where product_id = 10
 
 
 
+-- 187 orders shipping to usa or france 
+select * from orders
+where ship_country in ('USA' , 'France')
+order by ship_country
+
+-- 187 count total no of orders shipping to usa or france 
+select ship_country  , count(*) from orders
+where ship_country in ('USA' , 'France')
+group by ship_country
+
+--188 select orders from latiln country
+SELECT * FROM orders order by ship_region
+SELECT * FROM orders
+WHERE ship_country IN ('Brazil','Mexico','Argentina','Venezuela') ORDER BY ship_country
+
+-- 189 show order total amount per each order line 
+select * from order_details
+
+select (unit_price * quantity) as Total from order_details
+
+-- 190 select first and last order date
+select min(order_date) as oldest , max(order_date) as latest 
+from orders
+
+-- 191 total products in each categpryad
+select * from products
+select * from categories
+select 
+c.category_id , 
+c.category_name,
+count(product_id)
+from products as p
+inner join categories as c using (category_id)
+group by c.category_id
+
+-- 192 list products that need rearanging
+select * from products
+where units_in_stock <= reorder_level
+
+-- 193 list top 5 county with freight charges
+select 
+ship_country,
+max(freight)
+from orders 
+group by ship_country
+order by 2 desc
+limit 5
+
+-- 194 customer with no orders
+select * from customers;
+select * from orders
+
+select 
+*
+from 
+customers  as c left join orders as o using (customer_id)
+where o.order_id  is null
+
+-- 195 customer with total order amount
+
+select 
+customer_id,
+count(order_id)
+from 
+customers  as c inner join orders as o using (customer_id)
+group by customer_id
+order by 2 desc
+
+
+--- 196 orders with many line of items
+select order_id , count(product_id)
+ from order_details
+group by order_id
+
+-- 197 orders with double entry line 
+select * from orders
+where order_id = 10269 
+
+select order_id,
+quantity
+from order_details
+where quantity > 60 
+group by 
+    order_id,
+    quantity
+having 
+ count(*) > 1
+order by 2 desc
+
+-- 198 select late shipped orders
+select * from orders
+where required_date < shipped_date
+
+
+-- 199 select employee with late shipped orders
+WITH late_orders AS 
+(
+SELECT employee_id,
+COUNT(*) AS total_late_orders
+FROM  orders
+WHERE
+shipped_date>required_date
+GROUP by employee_id
+),
+all_orders AS
+(
+SELECT
+employee_id,
+COUNT(*) as total_orders
+FROM orders
+GROUP BY
+employee_id
+)
+select * from employees 
+SELECT
+e.employee_id,
+e.first_name,
+a.total_orders,
+l.total_late_orders
+FROM employees e
+JOIN all_orders a USING(employee_id)
+JOIN late_orders l USING(employee_id)
+
+-- 200  countries with customer or supplier 
+SELECT country FROM customers
+UNION
+SELECT country FROM suppliers
+
+-- 201 stock
+select * from stocks_prices
+where symbol_id = 1
+order by price_date
+limit 10
+
+-- 202 
+select symbol_id, 
+min(price_date)
+from stocks_prices
+group by symbol_id
+
+-- 203 cubrt 
+select 
+    close_price,
+    cbrt(close_price)
+from 
+    stocks_prices
+    where 
+    symbol_id = 1
+order by price_date 
 
